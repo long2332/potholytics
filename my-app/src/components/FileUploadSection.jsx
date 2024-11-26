@@ -71,39 +71,86 @@ const FileUploadSection = () => {
             <div className="p-4 overflow-y-auto h-full">
               <h2 className="text-xl font-bold mb-4">Pothole Detections</h2>
               
-              <div className="space-y-4">
-                {/* Handle single image case */}
-                {results.image && results.detections_count > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-lg font-medium mb-2">
-                      Pothole #1
-                    </h3>
-                    <img 
-                      src={`data:image/jpeg;base64,${results.image}`}
-                      alt="Detection Result"
-                      className="rounded-lg max-w-[500px] w-full mx-auto"
-                    />
-                  </div>
-                )}
+              <div className="overflow-x-auto">
+                <table className="min-w-full table-auto">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-2 text-left">Pothole #</th>
+                      <th className="px-4 py-2 text-left">Image</th>
+                      <th className="px-4 py-2 text-left">Potholes Detected</th>
+                      <th className="px-4 py-2 text-left">Date</th>
+                      <th className="px-4 py-2 text-left">Time</th>
+                      <th className="px-4 py-2 text-left">Latitude</th>
+                      <th className="px-4 py-2 text-left">Longitude</th>
+                      <th className="px-4 py-2 text-left">Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Handle single image case */}
+                    {results.image && (
+                      <tr className="border-b">
+                        <td className="px-4 py-2">1</td>
+                        <td className="px-4 py-2">
+                          <img 
+                            src={`data:image/jpeg;base64,${results.image}`}
+                            alt="Detection Result"
+                            className="h-20 w-auto rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2">{results.detections_count}</td>
+                        <td className="px-4 py-2">
+                          {results.info?.date ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {results.info?.time ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {results.info?.latitude ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {results.info?.longitude ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {results.info?.address ?? 'N/A'}
+                        </td>
+                      </tr>
+                    )}
 
-                {/* Handle video frames case */}
-                {results.frames && results.frames.map((frame, index) => (
-                  <div key={index} className="mb-4">
-                    <h3 className="text-lg font-medium mb-2">
-                      Pothole #{index + 1}
-                    </h3>
-                    <img 
-                      src={`data:image/jpeg;base64,${frame.image}`}
-                      alt={`Pothole ${index + 1}`}
-                      className="rounded-lg max-w-[500px] w-full mx-auto"
-                    />
-                  </div>
-                ))}
+                    {/* Handle video frames case */}
+                    {results.frames && results.frames.map((frame, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="px-4 py-2">{index + 1}</td>
+                        <td className="px-4 py-2">
+                          <img 
+                            src={`data:image/jpeg;base64,${frame.image}`}
+                            alt={`Pothole ${index + 1}`}
+                            className="h-20 w-auto rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2">{frame.detections_count}</td>
+                        <td className="px-4 py-2">
+                          {frame.info?.date ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {frame.info?.time ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {frame.info?.latitude ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {frame.info?.longitude ?? 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          {frame.info?.address ?? 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-                {/* Show message if no detections found */}
-                {(!results.image || results.detections_count === 0) && 
-                 (!results.frames || results.frames.length === 0) && (
-                  <p className="text-center text-gray-500">
+                {/* No detections message */}
+                {(!results.image && !results.frames) && (
+                  <p className="text-center text-gray-500 mt-4">
                     No potholes detected in this file.
                   </p>
                 )}
