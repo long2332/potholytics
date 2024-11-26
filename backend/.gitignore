@@ -1,0 +1,19 @@
+# Python specific
+__pycache__/
+*.py[cod]
+venv/
+env/
+
+# Environment files
+.env
+.env.local
+.env.*
+!.env.example
+
+# Upload directory
+uploads/
+uploads/*
+
+# Other
+.DS_Store
+*.log 
