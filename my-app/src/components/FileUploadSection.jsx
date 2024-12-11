@@ -86,36 +86,6 @@ const FileUploadSection = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Handle single image case */}
-                    {results.image && (
-                      <tr className="border-b">
-                        <td className="px-4 py-2">1</td>
-                        <td className="px-4 py-2">
-                          <img 
-                            src={`data:image/jpeg;base64,${results.image}`}
-                            alt="Detection Result"
-                            className="h-20 w-auto rounded"
-                          />
-                        </td>
-                        <td className="px-4 py-2">{results.detections_count}</td>
-                        <td className="px-4 py-2">
-                          {results.info?.date ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {results.info?.time ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {results.info?.latitude ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {results.info?.longitude ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {results.info?.address ?? 'N/A'}
-                        </td>
-                      </tr>
-                    )}
-
                     {/* Handle video frames case */}
                     {results.frames && results.frames.map((frame, index) => (
                       <tr key={index} className="border-b">

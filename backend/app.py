@@ -125,12 +125,12 @@ def detect_potholes():
         # Check if file is MP4
         is_video = filename.lower().endswith('.mp4')
         detections = []
-
+        annotated_frames = []  # Store annotated frames
         if is_video:
             # Process video
             cap = cv2.VideoCapture(filepath)
             frame_count = 0
-            annotated_frames = []  # Store annotated frames
+            
             
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -181,10 +181,7 @@ def detect_potholes():
             
             cap.release()
             
-            return jsonify({
-                "frames": annotated_frames,
-                "total_frames": len(annotated_frames)
-            })
+
 
         else:
             # Process image
@@ -218,16 +215,16 @@ def detect_potholes():
                     # Convert frame to base64
                     _, buffer = cv2.imencode('.jpg', frame)
                     frame_base64 = base64.b64encode(buffer).decode('utf-8')
-                    return jsonify({
+                    annotated_frames.append({
                         "info": info,
                         "image": frame_base64,
                         "detections_count": len(detection_data)
                     })
             
-            return jsonify({
-                "image": None,
-                "detections_count": 0
-            })
+        return jsonify({
+            "frames": annotated_frames,
+            "total_frames": len(annotated_frames)
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
