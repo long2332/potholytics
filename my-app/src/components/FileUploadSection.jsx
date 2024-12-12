@@ -306,22 +306,33 @@ const FileUploadSection = () => {
               <div className="text-sm text-gray-500">MP4 or Image files accepted</div>
             </div>
           </label>
-        </div>
 
-        {preview && (
-          <div className="mt-6">
-            <h3 className="font-medium mb-3">Preview:</h3>
-            <div className="border rounded-lg p-4">
-              {file?.type.startsWith('image/') ? (
-                <img src={preview} alt="Preview" className="max-h-96 mx-auto" />
-              ) : (
-                <video src={preview} controls className="max-h-96 mx-auto">
-                  Your browser does not support the video tag.
-                </video>
-              )}
+          {preview && (
+            <div className="mt-6 relative">
+              <h3 className="font-medium mb-3">Preview:</h3>
+              <div className="border rounded-lg p-4">
+                {file?.type.startsWith('image/') ? (
+                  <img src={preview} alt="Preview" className="max-h-96 mx-auto" />
+                ) : (
+                  <video src={preview} controls className="max-h-96 mx-auto">
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+              </div>
+              <button 
+                className="absolute top-2 right-2 text-red-500"
+                onClick={() => {
+                  setFile(null);
+                  setPreview(null);
+                }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="mt-6">
           <button 
