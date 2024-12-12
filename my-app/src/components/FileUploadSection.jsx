@@ -170,14 +170,31 @@ const FileUploadSection = () => {
   const ResultsPanel = ({ results, isOpen, onClose }) => {
     if (!results) return null;
 
+    const [selectedRows, setSelectedRows] = useState(new Set());
+
+    const handleRowSelect = (index) => {
+      const newSelectedRows = new Set(selectedRows);
+      if (newSelectedRows.has(index)) {
+        newSelectedRows.delete(index);
+      } else {
+        newSelectedRows.add(index);
+      }
+      setSelectedRows(newSelectedRows);
+    };
+
+    const handleDeleteSelected = () => {
+      const updatedFrames = results.frames.filter((_, index) => !selectedRows.has(index));
+      setDetectionResults(prevResults => ({
+        ...prevResults,
+        frames: updatedFrames
+      }));
+      setSelectedRows(new Set());
+    };
+
     const handleRowClick = (index) => {
       setSelectedImageIndex(index);
       setShowDetailModal(true);
       setIsPanelOpen(false);
-    };
-
-    const handleSubmit = () => {
-      console.log('Rejected detections:', rejectedDetections);
     };
 
     return (
@@ -189,7 +206,7 @@ const FileUploadSection = () => {
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30 }}
             className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg"
-            style={{ height: '60vh', zIndex: 1000 }}
+            style={{ height: '80vh', zIndex: 1000 }}
           >
             <div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-4 cursor-pointer"
@@ -198,12 +215,17 @@ const FileUploadSection = () => {
 
             <div className="p-4 overflow-y-auto h-full">
               <h2 className="text-xl font-bold mb-4">Pothole Detections</h2>
-              
+              <button 
+                onClick={handleDeleteSelected}
+                className="custom_button"
+              >
+                Delete Selected
+              </button>
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto">
                   <thead>
-                    
                     <tr className="bg-gray-100">
+                      <th className="px-4 py-2 text-left">Select</th>
                       <th className="px-4 py-2 text-left">Pothole #</th>
                       <th className="px-4 py-2 text-left">Image</th>
                       <th className="px-4 py-2 text-left">Potholes Detected</th>
@@ -215,11 +237,20 @@ const FileUploadSection = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Handle video frames case */}
                     {results.frames && results.frames.map((frame, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => handleRowClick(index)}>
-                        <td className="px-4 py-2">{index + 1}</td>
+                      <tr key={index} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedRows.has(index)} 
+                            onChange={() => handleRowSelect(index)} 
+                          />
+                        </td>
+                        <td className="px-4 py-2">{index + 1}</td>
+                        <td 
+                          className="px-4 py-2 cursor-pointer" 
+                          onClick={() => handleRowClick(index)}
+                        >
                           <img 
                             src={`data:image/jpeg;base64,${frame.image}`}
                             alt={`Pothole ${index + 1}`}
@@ -227,21 +258,11 @@ const FileUploadSection = () => {
                           />
                         </td>
                         <td className="px-4 py-2">{frame.detections_count}</td>
-                        <td className="px-4 py-2">
-                          {frame.info?.date ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {frame.info?.time ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {frame.info?.latitude ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {frame.info?.longitude ?? 'N/A'}
-                        </td>
-                        <td className="px-4 py-2">
-                          {frame.info?.address ?? 'N/A'}
-                        </td>
+                        <td className="px-4 py-2">{frame.info?.date ?? 'N/A'}</td>
+                        <td className="px-4 py-2">{frame.info?.time ?? 'N/A'}</td>
+                        <td className="px-4 py-2">{frame.info?.latitude ?? 'N/A'}</td>
+                        <td className="px-4 py-2">{frame.info?.longitude ?? 'N/A'}</td>
+                        <td className="px-4 py-2">{frame.info?.address ?? 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>
