@@ -12,3 +12,5 @@ build/
 # Other common files to ignore
 .DS_Store
 *.log
+.ckpt
+.pt

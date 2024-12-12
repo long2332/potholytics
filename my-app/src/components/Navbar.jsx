@@ -15,16 +15,6 @@ const Navbar = () => {
               <Link to="/dashboard" className="text-gray-700 hover:text-gray-900">Dashboard</Link>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <button className="p-2">
-              <span className="text-xl">🌙</span>
-            </button>
-            <select className="border rounded px-3 py-1">
-              <option>English</option>
-              <option>Bahasa Melayu</option>
-            </select>
-          </div>
         </nav>
       </div>
     </header>

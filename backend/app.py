@@ -15,9 +15,11 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path='../my-app/.env')
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+# model = YOLO("yolo11_117_epochs_best.pt")
 
 # Load the YOLO model
-model = YOLO("yolo11_117_epochs_best.pt")
+model = YOLO("SEA_yolo11_200epochs.pt")
+model = YOLO("yolo8_100epochs.pt")
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -107,8 +109,24 @@ def extract_image_info(image):
     }
     return result
 
+# Add these lines near the top of the file with your model loading
+MODELS = {
+    'yolov8': "yolo8_100epochs.pt",
+    'yolov11': "SEA_yolo11_200epochs.pt"
+}
+
 @app.route('/detect-potholes', methods=['POST'])
 def detect_potholes():
+    # Get the selected model from the request, default to YOLOv8 if not specified
+    selected_model = request.form.get('model', 'yolov11')
+    
+    # Load the selected model
+    model_path = MODELS.get(selected_model)
+    if not model_path:
+        return jsonify({'error': 'Invalid model selected'}), 400
+    
+    model = YOLO(model_path)
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     

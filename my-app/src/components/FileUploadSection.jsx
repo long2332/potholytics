@@ -8,6 +8,10 @@ const FileUploadSection = () => {
   const [detectionResults, setDetectionResults] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [detections, setDetections] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('yolov11');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(null);
+
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -28,6 +32,7 @@ const FileUploadSection = () => {
       
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('model', selectedModel);
 
       const response = await fetch('http://localhost:5000/detect-potholes', {
         method: 'POST',
@@ -49,8 +54,131 @@ const FileUploadSection = () => {
     }
   };
 
+
+  const DetailModal = ({ isOpen, onClose, results }) => {
+    if (!isOpen || selectedImageIndex === null) return null;
+
+    const images = results.frames
+    const currentImage = images[selectedImageIndex];
+    const isFirstImage = selectedImageIndex === 0;
+    const isLastImage = selectedImageIndex === images.length - 1;
+
+    const handlePrevious = () => {
+      if (!isFirstImage) {
+        setSelectedImageIndex(prev => prev - 1);
+      }
+  };
+
+    const handleNext = () => {
+      if (!isLastImage) {
+        setSelectedImageIndex(prev => prev + 1);
+      }
+    };
+
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <div className="bg-white rounded-lg w-11/12 h-5/6 max-w-7xl overflow-hidden relative">
+              <button
+                onClick={onClose}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="grid grid-cols-2 h-full">
+                {/* Left side - Image */}
+                <div className="p-8 flex items-center justify-center bg-gray-100">
+              <motion.img
+                key={selectedImageIndex}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                    src={`data:image/jpeg;base64,${currentImage.image}`}
+                    alt="Detection Detail"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+
+                {/* Right side - Details */}
+            <motion.div 
+              key={selectedImageIndex}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="p-8 overflow-y-auto"
+            >
+                  <h2 className="text-2xl font-bold mb-6">Detection Details</h2>
+                  <div className="space-y-4">
+                    <DetailRow label="Potholes Detected" value={currentImage.detections_count} />
+                    <DetailRow label="Date" value={currentImage.info?.date ?? 'N/A'} />
+                    <DetailRow label="Time" value={currentImage.info?.time ?? 'N/A'} />
+                    <DetailRow label="Latitude" value={currentImage.info?.latitude ?? 'N/A'} />
+                    <DetailRow label="Longitude" value={currentImage.info?.longitude ?? 'N/A'} />
+                    <DetailRow label="Address" value={currentImage.info?.address ?? 'N/A'} />
+                  </div>
+            </motion.div>
+
+                {/* Navigation buttons */}
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevious}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg 
+                    ${isFirstImage ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700'}`}
+                      disabled={isFirstImage}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg 
+                    ${isLastImage ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700'}`}
+                      disabled={isLastImage}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  };
+
+  const DetailRow = ({ label, value }) => (
+    <div className="flex flex-col">
+      <span className="text-gray-600 text-sm">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+
   const ResultsPanel = ({ results, isOpen, onClose }) => {
     if (!results) return null;
+
+    const handleRowClick = (index) => {
+      setSelectedImageIndex(index);
+      setShowDetailModal(true);
+      setIsPanelOpen(false);
+    };
+
+    const handleSubmit = () => {
+      console.log('Rejected detections:', rejectedDetections);
+    };
 
     return (
       <AnimatePresence>
@@ -74,6 +202,7 @@ const FileUploadSection = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto">
                   <thead>
+                    
                     <tr className="bg-gray-100">
                       <th className="px-4 py-2 text-left">Pothole #</th>
                       <th className="px-4 py-2 text-left">Image</th>
@@ -88,7 +217,7 @@ const FileUploadSection = () => {
                   <tbody>
                     {/* Handle video frames case */}
                     {results.frames && results.frames.map((frame, index) => (
-                      <tr key={index} className="border-b">
+                      <tr key={index} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => handleRowClick(index)}>
                         <td className="px-4 py-2">{index + 1}</td>
                         <td className="px-4 py-2">
                           <img 
@@ -143,6 +272,22 @@ const FileUploadSection = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="mb-4">
+          <label htmlFor="model-select" className="block text-sm font-medium text-gray-700 mb-2">
+            Select Detection Model
+          </label>
+          <select
+            id="model-select"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="yolov11">YOLOv11n</option>
+            <option value="yolov8">YOLOv8</option>
+            
+          </select>
+        </div>
+
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
           <input
             type="file"
@@ -193,10 +338,32 @@ const FileUploadSection = () => {
         </div>
       </div>
 
+      {detectionResults && (
+        <motion.button
+          initial={{ y: 100 }}
+          animate={{ y: 0 }}
+          onClick={() => setIsPanelOpen(!isPanelOpen)}
+          className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 p-2 flex flex-col items-center gap-1"
+        >
+          <div 
+            className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto cursor-pointer"
+          />
+          <div className="text-gray-600 font-medium">
+            {isPanelOpen ? 'Hide Results' : 'Show Results'}
+          </div>
+        </motion.button>
+      )}
+
       <ResultsPanel 
         results={detectionResults}
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
+      />
+      
+      <DetailModal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        results={detectionResults}
       />
     </div>
   );
