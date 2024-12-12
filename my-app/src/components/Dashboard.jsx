@@ -62,11 +62,8 @@ const Dashboard = () => {
         <h2 className="text-xl font-semibold mb-4">Map of Pothole Locations</h2>
             <APIProvider apiKey="AIzaSyCF2bom3zeeMFeb8D8svVdf_tLVLD4rYfQ">
             <div style={{ height: "80vh", width: "100%" }}>
-            
-
-
-            
-                <Map zoom={9} center={center} mapId="8e700f7bc61d867b">
+                       
+                <Map zoom={9} zoomControl={true} center={center} mapId="8e700f7bc61d867b">
                 <PoiMarkers pois={markers} />
                 <Pin 
                 background={'#FBBC04'} 
@@ -80,8 +77,6 @@ const Dashboard = () => {
     </div>
   );
 };
-
-
 
 const PoiMarkers = ({pois}) => {
     return (
