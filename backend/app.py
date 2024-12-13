@@ -12,7 +12,10 @@ import easyocr
 import re
 import os
 from dotenv import load_dotenv
+from google.cloud import vision
 load_dotenv(dotenv_path='../my-app/.env')
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "melodic-argon-392105-53b6a5fcfdfe.json"
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 # model = YOLO("yolo11_117_epochs_best.pt")
@@ -21,6 +24,7 @@ CORS(app)  # Enable CORS for all routes
 model = YOLO("SEA_yolo11_200epochs.pt")
 model = YOLO("yolo8_100epochs.pt")
 
+client = vision.ImageAnnotatorClient()
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -37,6 +41,26 @@ def resize_image(image):
     # Resize image
     return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
 
+def detect_text(frame):
+    """
+    Extract text from a single video frame using Google Cloud Vision API.
+    """
+    # Convert frame (NumPy array) to bytes
+    _, encoded_image = cv2.imencode('.jpg', frame)
+    content = encoded_image.tobytes()
+
+    # Prepare image for Google Vision API
+    image = vision.Image(content=content)
+    response = client.text_detection(image=image)
+
+    if response.error.message:
+        raise Exception(response.error.message)
+
+    # Extract text from response
+    text = response.text_annotations[0].description if response.text_annotations else ""
+    return text.replace("\n", " ")  # Replace newlines with a space
+
+
 def get_address_from_coordinates(lat, lon):
     api_key = os.getenv('GOOGLE_MAPS_API_KEY')
     url = f'https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lon}&key={api_key}'
@@ -49,16 +73,14 @@ def get_address_from_coordinates(lat, lon):
     return "Address not found"
 
 def extract_image_info(image):
-    # Initialize reader once (you can move this to global scope)
-    reader = easyocr.Reader(['en'])
+   
     # Get bottom portion of image
     height = image.shape[0]
 
     bottom_crop = image[height-100:height, :]
 
     # Extract text using EasyOCR
-    results = reader.readtext(bottom_crop)
-    text = ' '.join([result[1] for result in results])
+    text = detect_text(bottom_crop)
     print("Extracted text:", text)  # Debug print
     
     # Separate patterns for date and time
@@ -69,7 +91,7 @@ def extract_image_info(image):
 
     # Updated pattern to match the specific format with km/h
     longitude_pattern = re.compile(r'km/h\s*E\s*(\d+\s*\.\s*\d+)')
-    latitude_pattern = re.compile(r',\s*N\s*(\d+\s*\.\s*\d+)')  # Updated to capture potential spaces
+    latitude_pattern = re.compile(r',\s*[№N]\s*(\d+\s*\.\s*\d+)')  # Updated to capture potential spaces and both '№' and 'N'
     
     latitude_match = latitude_pattern.search(text)
     longitude_match = longitude_pattern.search(text)

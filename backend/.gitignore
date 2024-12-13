@@ -19,3 +19,4 @@ uploads/*
 *.log 
 *.ckpt
 *.pt
+melodic-argon-392105-53b6a5fcfdfe.json

@@ -101,7 +101,7 @@ const FileUploadSection = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20"
           >
             <div className="bg-white rounded-lg w-11/12 h-5/6 max-w-7xl overflow-hidden relative">
               <button
@@ -213,19 +213,14 @@ const FileUploadSection = () => {
     const handleRowClick = (index) => {
       setSelectedImageIndex(index);
       setShowDetailModal(true);
-      setIsPanelOpen(false);
     };
 
     return (
       <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: '0%' }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30 }}
+        {isOpen && !isProcessing && (
+          <div
             className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg"
-            style={{ height: '80vh', zIndex: 1000 }}
+            style={{ height: '80vh', zIndex: 10 }}
           >
             <div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-4 cursor-pointer"
@@ -234,12 +229,20 @@ const FileUploadSection = () => {
 
             <div className="p-4 overflow-y-auto h-full">
               <h2 className="text-xl font-bold mb-4">Pothole Detections</h2>
-              <button 
-                onClick={handleDeleteSelected}
-                className="mt-4 mb-4 py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white"
-              >
-                Delete Selected
-              </button>
+              <div className="flex justify-between">
+                <button 
+                  onClick={handleDeleteSelected}
+                  className="mt-4 mb-4 py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Delete Selected
+                </button>
+                <button 
+                  onClick={() => alert('Submit action triggered!')}
+                  className="mt-4 mb-4 py-2 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white"
+                >
+                  Submit
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto">
                   <thead>
@@ -295,7 +298,7 @@ const FileUploadSection = () => {
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     );
@@ -397,21 +400,19 @@ const FileUploadSection = () => {
         </div>
       </div>
 
-      {detectionResults && (
-        <motion.button
-          initial={{ y: 100 }}
-          animate={{ y: 0 }}
-          onClick={() => setIsPanelOpen(!isPanelOpen)}
-          className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 p-2 flex flex-col items-center gap-1"
-        >
-          <div 
-            className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto cursor-pointer"
-          />
-          <div className="text-gray-600 font-medium">
-            {isPanelOpen ? 'Hide Results' : 'Show Results'}
-          </div>
-        </motion.button>
-      )}
+      <button
+        onClick={() => {
+          if (!isProcessing) {
+            setIsPanelOpen(!isPanelOpen);
+          }
+        }}
+        className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 p-2 flex flex-col items-center gap-1"
+      >
+        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto cursor-pointer" />
+        <div className="text-gray-600 font-medium">
+          {isPanelOpen ? 'Hide Results' : 'Show Results'}
+        </div>
+      </button>
 
       <ResultsPanel 
         results={detectionResults}
