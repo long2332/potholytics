@@ -153,6 +153,14 @@ def detect_potholes():
         is_video = filename.lower().endswith('.mp4')
         detections = []
         annotated_frames = []  # Store annotated frames
+        last_info = {
+        'date': None,
+        'time': None,
+        'latitude': None,
+        'longitude': None,
+        'address': None
+        }
+      
         if is_video:
             # Process video
             cap = cv2.VideoCapture(filepath)
@@ -167,14 +175,18 @@ def detect_potholes():
                     break
 
                 if frame_count % 30 == 0:  # Process every 30th frame (1 fps)
-                    # Run inference
                     info = extract_image_info(frame)
-                    # print("Info: " + info["latitude"])
-                    # print("Frame: " ) + annotated_frames[-1]["latitude"]
-                    results = model(frame)
+
+                    if info.get("latitude") == last_info.get("latitude") and info.get("longitude") == last_info.get("longitude"):
+                        frame_count += 1
+                        last_info = info
+                        continue
+                    else:
+                        results = model(frame)
+                    last_info = info
                     
                     # Process results
-                    if len(results) > 0:
+                    if results and len(results) > 0:
                         result = results[0]
                         detection_data = sv.Detections.from_ultralytics(result)
                         
@@ -207,7 +219,7 @@ def detect_potholes():
                                 "image": frame_base64,
                                 "detections_count": len(detection_data)
                             })
-
+                        results = None
                 frame_count += 1
             
             cap.release()
