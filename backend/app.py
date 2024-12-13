@@ -115,8 +115,17 @@ MODELS = {
     'yolov11': "SEA_yolo11_200epochs.pt"
 }
 
+@app.route('/stop-detection', methods=['POST'])
+def stop_detection():
+    global is_detection_stopped
+    is_detection_stopped = True  # Set the flag to stop detection
+    return jsonify({'message': 'Detection stopped'}), 200
+
 @app.route('/detect-potholes', methods=['POST'])
 def detect_potholes():
+    global is_detection_stopped
+    is_detection_stopped = False  # Reset the stop flag at the start
+    
     # Get the selected model from the request, default to YOLOv8 if not specified
     selected_model = request.form.get('model', 'yolov11')
     
@@ -149,14 +158,19 @@ def detect_potholes():
             cap = cv2.VideoCapture(filepath)
             frame_count = 0
             
-            
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     break
 
+                if is_detection_stopped:  # Check if detection should stop
+                    break
+
                 if frame_count % 30 == 0:  # Process every 30th frame (1 fps)
                     # Run inference
+                    info = extract_image_info(frame)
+                    # print("Info: " + info["latitude"])
+                    # print("Frame: " ) + annotated_frames[-1]["latitude"]
                     results = model(frame)
                     
                     # Process results
@@ -166,7 +180,6 @@ def detect_potholes():
                         
                         # Only process frames with detections
                         if len(detection_data) > 0:
-                            info = extract_image_info(frame)
                             # Create annotators
                             box_annotator = sv.BoxAnnotator(thickness=4)
                             label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
@@ -198,12 +211,12 @@ def detect_potholes():
                 frame_count += 1
             
             cap.release()
-            
-
 
         else:
             # Process image
             frame = cv2.imread(filepath)
+            if is_detection_stopped:  # Check if detection should stop
+                return jsonify({'error': 'Detection stopped'}), 200
 
             results = model(frame)
             

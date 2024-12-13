@@ -11,6 +11,7 @@ const FileUploadSection = () => {
   const [selectedModel, setSelectedModel] = useState('yolov11');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(null);
+  const [isDetectionStopped, setIsDetectionStopped] = useState(false);
 
 
   const handleFileChange = (e) => {
@@ -29,6 +30,7 @@ const FileUploadSection = () => {
 
     try {
       setIsProcessing(true);
+      setIsDetectionStopped(false);
       
       const formData = new FormData();
       formData.append('file', file);
@@ -51,6 +53,23 @@ const FileUploadSection = () => {
       alert('Failed to process the file');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleStopDetection = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/stop-detection', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to stop detection');
+      }
+
+      setIsDetectionStopped(true);
+    } catch (error) {
+      console.error('Error stopping detection:', error);
+      alert('Failed to stop detection');
     }
   };
 
@@ -217,7 +236,7 @@ const FileUploadSection = () => {
               <h2 className="text-xl font-bold mb-4">Pothole Detections</h2>
               <button 
                 onClick={handleDeleteSelected}
-                className="custom_button"
+                className="mt-4 mb-4 py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white"
               >
                 Delete Selected
               </button>
@@ -367,6 +386,14 @@ const FileUploadSection = () => {
           >
             {isProcessing ? 'Processing...' : 'Detect Potholes'}
           </button>
+          {isProcessing && (
+            <button 
+              className="w-full mt-2 py-2 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleStopDetection}
+            >
+              Stop Detection
+            </button>
+          )}
         </div>
       </div>
 
