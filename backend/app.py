@@ -38,7 +38,7 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-if not os.getenv('GOOGLE_MAPS_API_KEY'):
+if not os.getenv('VITE_GOOGLE_MAPS_API_KEY'):
     raise ValueError("GOOGLE_MAPS_API_KEY environment variable is not set")
 
 def resize_image(image):
