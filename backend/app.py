@@ -246,6 +246,8 @@ def detect_potholes():
                                 confidence = float(detection[2])
                                 class_id = int(detection[3])
                                 labels.append(f"{model.names[int(class_id)]} {confidence:0.2f}")
+
+                            
                             
                             # Annotate the frame
                             frame = box_annotator.annotate(scene=frame, detections=detection_data)
@@ -258,7 +260,7 @@ def detect_potholes():
                             _, buffer = cv2.imencode('.jpg', frame)
                             frame_base64 = base64.b64encode(buffer).decode('utf-8')
                             
-                            annotated_frames.append({
+                            annotated_frames.insert(0, {
                                 "info": info,
                                 "image": frame_base64,
                                 "detections_count": len(detection_data)
@@ -302,12 +304,11 @@ def detect_potholes():
                     # Convert frame to base64
                     _, buffer = cv2.imencode('.jpg', frame)
                     frame_base64 = base64.b64encode(buffer).decode('utf-8')
-                    annotated_frames.append({
+                    annotated_frames.insert(0, {
                         "info": info,
                         "image": frame_base64,
                         "detections_count": len(detection_data)
                     })
-            
         return jsonify({
             "frames": annotated_frames
         })
@@ -333,6 +334,29 @@ def save_detections():
     except Exception as e:
         print("Error saving detections:", e)
         return jsonify({'message': 'Failed to save detections'}), 500
+@app.route('/get-pothole-data', methods=['GET'])
+def get_pothole_data():
+    try:
+        # Create a MongoClient
+        client = MongoClient(os.environ["MONGODB_URI"])
+        database = client["potholytics"]
+        collection = database["potholes"]
+        
+        # Retrieve all documents from the collection
+        pothole_data = list(collection.find({}))
+        
+        # Convert ObjectId to string
+        for pothole in pothole_data:
+            pothole['_id'] = str(pothole['_id'])  # Convert ObjectId to string
+        
+        # Close the connection
+        client.close()
+        
+        # Return the data as JSON
+        return jsonify(pothole_data), 200
+    except Exception as e:
+        print("Error retrieving data:", e)
+        return jsonify({'error': 'Failed to retrieve data'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
