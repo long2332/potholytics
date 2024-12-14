@@ -13,6 +13,8 @@ import re
 import os
 from dotenv import load_dotenv
 from google.cloud import vision
+from pymongo import MongoClient
+
 load_dotenv(dotenv_path='../my-app/.env')
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "melodic-argon-392105-53b6a5fcfdfe.json"
@@ -23,6 +25,12 @@ CORS(app)  # Enable CORS for all routes
 # Load the YOLO model
 model = YOLO("SEA_yolo11_200epochs.pt")
 model = YOLO("yolo8_100epochs.pt")
+
+# Add these lines near the top of the file with your model loading
+MODELS = {
+    'yolov8': "yolo8_100epochs.pt",
+    'yolov11': "SEA_yolo11_200epochs.pt"
+}
 
 client = vision.ImageAnnotatorClient()
 # Configure upload folder
@@ -131,11 +139,25 @@ def extract_image_info(image):
     }
     return result
 
-# Add these lines near the top of the file with your model loading
-MODELS = {
-    'yolov8': "yolo8_100epochs.pt",
-    'yolov11': "SEA_yolo11_200epochs.pt"
-}
+def insert_frames(frames):
+    try:
+        # Create a MongoClient
+        client = MongoClient(os.environ["MONGODB_URI"])
+
+        # Connect to the database
+        database = client["potholytics"]
+        collection = database["potholes"]
+        print("MongoDB connection successful")
+        # Insert the frames into the collection
+        result = collection.insert_many(frames)
+        
+        # Close the connection
+        client.close()
+        return(True)
+
+    except Exception as e:
+        print("Failed to connect to MongoDB:", e)
+
 
 @app.route('/stop-detection', methods=['POST'])
 def stop_detection():
@@ -287,8 +309,7 @@ def detect_potholes():
                     })
             
         return jsonify({
-            "frames": annotated_frames,
-            "total_frames": len(annotated_frames)
+            "frames": annotated_frames
         })
 
     except Exception as e:
@@ -299,5 +320,19 @@ def detect_potholes():
         if os.path.exists(filepath):
             os.remove(filepath)
 
+@app.route('/save-detections', methods=['POST'])
+def save_detections():
+    try:
+        frames = request.json
+        insert_result = insert_frames(frames)  # Call the insert_frames function
+        if insert_result:
+            return jsonify({'message': 'Detections saved successfully!'}), 201
+        else:
+            print("Error")
+            return jsonify({'message': 'Failed to save detections'}), 500
+    except Exception as e:
+        print("Error saving detections:", e)
+        return jsonify({'message': 'Failed to save detections'}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=5000)

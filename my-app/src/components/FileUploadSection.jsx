@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { uploadToBlob } from '../services/azureStorage'; // Import the uploadToBlob function
 
 const FileUploadSection = () => {
   const [file, setFile] = useState(null);
@@ -73,6 +74,59 @@ const FileUploadSection = () => {
     }
   };
 
+  const handleSubmit = async () => {
+    if (!detectionResults || !detectionResults.frames.length) return;
+
+    try {
+      // Create a new array to hold the updated frames
+      const updatedFrames = await Promise.all(
+        detectionResults.frames.map(async (frame) => {
+          // Convert base64 to a Blob
+          const byteCharacters = atob(frame.image); // Decode base64
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' }); // Create a Blob
+
+          // Create a File object from the Blob
+          const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+
+          // Upload the image to Azure Blob Storage
+          const uploadResult = await uploadToBlob(file); // Use the File object
+
+          if (uploadResult.success) {
+            // Replace frame.image with the URL returned from Azure
+            return {
+              ...frame,
+              image: uploadResult.url, // Use the URL from Azure
+            };
+          } else {
+            throw new Error('Failed to upload image to Azure');
+          }
+        })
+      );
+
+      // Send the updated frames to the server
+      const response = await fetch('http://localhost:5000/save-detections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedFrames), // Send updated frames data to the server
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save detections');
+      }
+
+      alert('Detections saved successfully!'); // Notify user of success
+    } catch (error) {
+      console.error('Error saving detections:', error);
+      alert('Failed to save detections'); // Notify user of failure
+    }
+  };
 
   const DetailModal = ({ isOpen, onClose, results }) => {
     if (!isOpen || selectedImageIndex === null) return null;
@@ -237,7 +291,7 @@ const FileUploadSection = () => {
                   Delete Selected
                 </button>
                 <button 
-                  onClick={() => alert('Submit action triggered!')}
+                  onClick={handleSubmit}
                   className="mt-4 mb-4 py-2 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white"
                 >
                   Submit
