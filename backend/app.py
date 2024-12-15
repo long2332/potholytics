@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 import supervision as sv
 import numpy as np
@@ -14,8 +14,18 @@ import os
 from dotenv import load_dotenv
 from google.cloud import vision
 from pymongo import MongoClient
+from azure.storage.blob import BlobServiceClient, BlobClient
 
 load_dotenv(dotenv_path='../my-app/.env')
+
+blob_service_url = f"https://{os.getenv('VITE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net"
+
+# Initialize the BlobServiceClient
+blob_service_client = BlobServiceClient(account_url=blob_service_url, credential=os.getenv('VITE_AZURE_SAS_TOKEN'))
+
+# Get the container client
+container_client = blob_service_client.get_container_client(os.getenv('VITE_CONTAINER_NAME'))
+
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "melodic-argon-392105-53b6a5fcfdfe.json"
 app = Flask(__name__)
@@ -357,6 +367,36 @@ def get_pothole_data():
     except Exception as e:
         print("Error retrieving data:", e)
         return jsonify({'error': 'Failed to retrieve data'}), 500
+
+def retrieve_image(blob_url):
+    container_client = blob_service_client.get_container_client(os.getenv("VITE_CONTAINER_NAME"))
+    blob_name = blob_url.split("/").pop().split("?")[0]
+    blob_data = container_client.download_blob(blob_name)
+    image_data = blob_data.readall()  # Read the blob data into memory
+    return image_data
+
+# Flask route to fetch the image and return it as Base64
+@app.route('/get_image', methods=['GET'])
+def get_image():
+    # Extract the blob URL from the query parameters
+    blob_url = request.args.get('blob_url')
+    print(blob_url)
+
+    if not blob_url:
+        return jsonify({"error": "No blob_url provided"}), 400
+    
+    try:
+        # Retrieve the image data as bytes
+        image_data = retrieve_image(blob_url)
+        
+        # Encode the image data to Base64
+        image_base64 = base64.b64encode(image_data).decode('utf-8')  # Decode to get a string
+
+        # Return the Base64 string as a JSON response
+        return jsonify({"image_base64": image_base64})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

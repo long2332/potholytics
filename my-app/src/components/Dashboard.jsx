@@ -9,6 +9,7 @@ const Dashboard = () => {
   const [potholeData, setPotholeData] = useState([]);
   const [uniqueRecentDetections, setUniqueRecentDetections] = useState([]);
   const [selectedPothole, setSelectedPothole] = useState(null);
+  const [potholeImage, setPotholeImage] = useState(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
@@ -49,11 +50,13 @@ const Dashboard = () => {
       const key = `${city}, ${state}`;
       pothole.info.city = city;
       pothole.info.state = state;
+      const imageUrl = String(pothole.image).split('?')[0];
+      pothole.image = `${imageUrl}?${import.meta.env.VITE_AZURE_SAS_TOKEN}`;
+      console.log(pothole.image)
       if (!uniqueLocations[key] && city && state) {
         uniqueLocations[key] = { ...pothole, city, state };
       }
     }
-
     const recentDetections = Object.values(uniqueLocations)
       .sort((a, b) => new Date(b.info.datetime) - new Date(a.info.datetime))
       .slice(0, 5);
@@ -98,7 +101,7 @@ const Dashboard = () => {
   const markers = potholeData.map((pothole, index) => ({
     key: index.toString(),
     location: { lat: pothole.info.latitude, lng: pothole.info.longitude },
-    image: pothole.info.image
+    image: pothole.image
   }));
 
   const getPotholeCounts = (data) => {
@@ -135,6 +138,13 @@ const Dashboard = () => {
       backgroundColor: 'rgba(153, 102, 255, 0.6)',
     }],
   };
+
+  const handleMarkerClick = (imageUrl) => {
+    setPotholeImage(imageUrl);
+  };
+  
+
+  
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -189,28 +199,36 @@ const Dashboard = () => {
         <h2 className="text-xl font-semibold mb-4">Map of Pothole Locations</h2>
         <APIProvider apiKey={apiKey}>
           <div style={{ height: "80vh", width: "100%" }}>
-          <Map 
-              defaultCenter={center} // Set the center of the map
+            <Map 
+              defaultCenter={center}
               mapId="8e700f7bc61d867b"
-              zoomControl={true} // Enable zoom control
-              scrollwheel={true} // Allow zooming with the scroll wheel
-              defaultZoom={9} // Set the initial zoom level
-              draggable={true} // Allow dragging the map
+              zoomControl={true}
+              scrollwheel={true}
+              defaultZoom={9}
+              draggable={true}
             >
               {markers.map(marker => (
                 <AdvancedMarker
                   key={marker.key}
                   position={marker.location}
-
+                  onClick={() => {
+                    setSelectedPothole(marker)
+                    handleMarkerClick(marker.image)}}
                 >
                   <Pin background={'#FBBC04'} glyphColor={'#000'} borderColor={'#000'} />
                 </AdvancedMarker>
               ))}
-
             </Map>
           </div>
         </APIProvider>
       </div>
+
+      {potholeImage && (
+        <div className="mt-4">
+          <h2 className="text-xl font-semibold mb-2">Pothole Image</h2>
+          <img src={potholeImage} alt="Pothole" className="rounded-lg shadow" />
+        </div>
+      )}
     </div>
   );
 };
