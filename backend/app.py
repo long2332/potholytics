@@ -32,14 +32,13 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 # model = YOLO("yolo11_117_epochs_best.pt")
 
-# Load the YOLO model
-model = YOLO("SEA_yolo11_200epochs.pt")
-model = YOLO("yolo8_100epochs.pt")
 
 # Add these lines near the top of the file with your model loading
 MODELS = {
-    'yolov8': "yolo8_100epochs.pt",
-    'yolov11': "SEA_yolo11_200epochs.pt"
+    'yolov11n': "SEA_yolo11n_200epochs.pt",
+    'yolov11l': "SEA_yolo11l_best.pt",
+    're-detr': "SEA_rt-detr.pt",
+    'detr': "SEA_DETR_epoch=epoch=31-val_loss=val_loss=0.00.ckpt"
 }
 
 client = vision.ImageAnnotatorClient()
@@ -80,7 +79,7 @@ def detect_text(frame):
 
 
 def get_address_from_coordinates(lat, lon):
-    api_key = os.getenv('GOOGLE_MAPS_API_KEY')
+    api_key = os.getenv('VITE_GOOGLE_MAPS_API_KEY')
     url = f'https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lon}&key={api_key}'
     
     response = requests.get(url)
@@ -180,15 +179,15 @@ def detect_potholes():
     global is_detection_stopped
     is_detection_stopped = False  # Reset the stop flag at the start
     
-    # Get the selected model from the request, default to YOLOv8 if not specified
-    selected_model = request.form.get('model', 'yolov11')
+    # Get the selected model from the request, default to YOLOv11n if not specified
+    selected_model = request.form.get('model', 'yolov11n')
     
     # Load the selected model
     model_path = MODELS.get(selected_model)
     if not model_path:
         return jsonify({'error': 'Invalid model selected'}), 400
-    
-    model = YOLO(model_path)
+    if selected_model != "detr":
+        model = YOLO(model_path)
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400

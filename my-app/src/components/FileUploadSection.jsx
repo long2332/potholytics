@@ -9,7 +9,7 @@ const FileUploadSection = () => {
   const [detectionResults, setDetectionResults] = useState(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [detections, setDetections] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('yolov11');
+  const [selectedModel, setSelectedModel] = useState('yolov11n');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(null);
   const [isDetectionStopped, setIsDetectionStopped] = useState(false);
@@ -379,8 +379,10 @@ const FileUploadSection = () => {
             onChange={(e) => setSelectedModel(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="yolov11">YOLOv11n</option>
-            <option value="yolov8">YOLOv8</option>
+            <option value="yolov11n">YOLOv11n</option>
+            <option value="yolov11l">YOLOv11l</option>
+            <option value="re-detr">RT-DETR</option>
+            <option value="detr">DETR</option>
             
           </select>
         </div>

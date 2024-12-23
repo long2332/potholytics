@@ -194,41 +194,52 @@ const Dashboard = () => {
           <Bar data={cityChartData} />
         </div>
       </div>
-
       <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-4">Map of Pothole Locations</h2>
-        <APIProvider apiKey={apiKey}>
-          <div style={{ height: "80vh", width: "100%" }}>
-            <Map 
-              defaultCenter={center}
-              mapId="8e700f7bc61d867b"
-              zoomControl={true}
-              scrollwheel={true}
-              defaultZoom={9}
-              draggable={true}
-            >
-              {markers.map(marker => (
-                <AdvancedMarker
-                  key={marker.key}
-                  position={marker.location}
-                  onClick={() => {
-                    setSelectedPothole(marker)
-                    handleMarkerClick(marker.image)}}
-                >
-                  <Pin background={'#FBBC04'} glyphColor={'#000'} borderColor={'#000'} />
-                </AdvancedMarker>
-              ))}
-            </Map>
-          </div>
-        </APIProvider>
-      </div>
-
-      {potholeImage && (
-        <div className="mt-4">
-          <h2 className="text-xl font-semibold mb-2">Pothole Image</h2>
-          <img src={potholeImage} alt="Pothole" className="rounded-lg shadow" />
+      <h2 className="text-xl font-semibold mb-4">Map of Pothole Locations</h2>
+      <APIProvider apiKey={apiKey}>
+        <div style={{ height: "80vh", width: "100%" }}>
+          <Map 
+            defaultCenter={center}
+            mapId="8e700f7bc61d867b"
+            zoomControl={true}
+            scrollwheel={true}
+            defaultZoom={9}
+            draggable={true}
+          >
+            {markers.map(marker => (
+              <AdvancedMarker
+                key={marker.key}
+                position={marker.location}
+                onClick={() => {
+                  setSelectedPothole(marker);
+                  handleMarkerClick(marker.image);
+                }}
+              >
+                <Pin background={'#FBBC04'} glyphColor={'#000'} borderColor={'#000'} />
+              </AdvancedMarker>
+            ))}
+            {selectedPothole && potholeImage && (
+              <InfoWindow
+                position={selectedPothole.location}
+                onCloseClick={() => {
+                  setSelectedPothole(null);
+                  setPotholeImage(null);
+                }}
+              >
+                <div>
+                <img 
+                  src={potholeImage} 
+                  alt="Pothole" 
+                  className="rounded-lg shadow" 
+                  style={{ width: '300px', height: '200px' }} // Set desired width and height
+                />
+                </div>
+              </InfoWindow>
+            )}
+          </Map>
         </div>
-      )}
+      </APIProvider>
+    </div>
     </div>
   );
 };
