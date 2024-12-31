@@ -12,6 +12,11 @@ const Comparison = () => {
   const [selectedModel1, setSelectedModel1] = useState('');
   const [selectedModel2, setSelectedModel2] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null); // State to hold the selected image for the modal
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); // State to control the detail modal
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // State to track the current image index
+  const [selectedImageIndex, setSelectedImageIndex] = useState(null); // State to track the selected image index
+  const [currentResults, setCurrentResults] = useState(null); // State to track which results are currently being viewed
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -97,7 +102,17 @@ const Comparison = () => {
                     <tr key={index}>
                       <td className="border border-gray-300 px-4 py-2">{index + 1}</td>
                       <td className="border border-gray-300 px-4 py-2">
-                        <img src={`data:image/jpeg;base64,${frame.image}`} alt={`Model 1 Pothole ${index + 1}`} className="h-20 w-auto rounded cursor-pointer" />
+                        <img 
+                          src={`data:image/jpeg;base64,${frame.image}`} 
+                          alt={`Model 1 Pothole ${index + 1}`} 
+                          className="h-20 w-auto rounded cursor-pointer" 
+                          onClick={() => {
+                            setSelectedImage(`data:image/jpeg;base64,${frame.image}`);
+                            setSelectedImageIndex(index);
+                            setCurrentResults('model1'); // Set current results to model 1
+                            setIsDetailModalOpen(true);
+                          }}
+                        />
                       </td>
                       <td className="border border-gray-300 px-4 py-2">{frame.detections_count}</td>
                     </tr>
@@ -120,7 +135,17 @@ const Comparison = () => {
                     <tr key={index}>
                       <td className="border border-gray-300 px-4 py-2">{index + 1}</td>
                       <td className="border border-gray-300 px-4 py-2">
-                        <img src={`data:image/jpeg;base64,${frame.image}`} alt={`Model 2 Pothole ${index + 1}`} className="h-20 w-auto rounded cursor-pointer" />
+                        <img 
+                          src={`data:image/jpeg;base64,${frame.image}`} 
+                          alt={`Model 2 Pothole ${index + 1}`} 
+                          className="h-20 w-auto rounded cursor-pointer" 
+                          onClick={() => {
+                            setSelectedImage(`data:image/jpeg;base64,${frame.image}`);
+                            setSelectedImageIndex(index);
+                            setCurrentResults('model2'); // Set current results to model 2
+                            setIsDetailModalOpen(true);
+                          }}
+                        />
                       </td>
                       <td className="border border-gray-300 px-4 py-2">{frame.detections_count}</td>
                     </tr>
@@ -134,10 +159,88 @@ const Comparison = () => {
     );
   };
 
-  const handleImageClick = (frames, index) => {
-    // Open a modal or navigate to a detailed view of the selected image
-    // This can be implemented as needed
-    console.log('Image clicked:', frames[index]);
+  const DetailModal = ({ isOpen, onClose, results }) => {
+    if (!isOpen || selectedImageIndex === null) return null;
+
+    const images = results.frames;
+    const currentImage = images[selectedImageIndex];
+    const isFirstImage = selectedImageIndex === 0;
+    const isLastImage = selectedImageIndex === images.length - 1;
+
+    const handlePrevious = () => {
+      if (!isFirstImage) {
+        setSelectedImageIndex(prev => prev - 1);
+      }
+    };
+
+    const handleNext = () => {
+      if (!isLastImage) {
+        setSelectedImageIndex(prev => prev + 1);
+      }
+    };
+
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20"
+          >
+            <div className="bg-white rounded-lg w-11/12 h-5/6 max-w-7xl overflow-hidden relative">
+              <button
+                onClick={onClose}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {/* Fullscreen Image */}
+              <div className="flex items-center justify-center h-full">
+                <motion.img
+                  key={selectedImageIndex}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  src={`data:image/jpeg;base64,${currentImage.image}`}
+                  alt="Detection Detail"
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+
+              {/* Navigation Buttons */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevious}
+                    className={`absolute left-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg 
+                      ${isFirstImage ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700'}`}
+                    disabled={isFirstImage}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg 
+                      ${isLastImage ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700'}`}
+                    disabled={isLastImage}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
   };
 
   return (
@@ -237,6 +340,13 @@ const Comparison = () => {
               setIsPanelOpen(false);
               setShowResults(false); // Hide results when panel is closed
             }}
+          />
+        )}
+        {isDetailModalOpen && (
+          <DetailModal 
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+            results={currentResults === 'model1' ? detectionResultsModel1 : detectionResultsModel2}
           />
         )}
       </AnimatePresence>
