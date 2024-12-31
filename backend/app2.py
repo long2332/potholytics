@@ -16,9 +16,14 @@ from google.cloud import vision
 from pymongo import MongoClient
 from azure.storage.blob import BlobServiceClient, BlobClient
 import torch
+import torchvision.transforms as T
 from transformers import DetrForObjectDetection, DetrImageProcessor
 import pytorch_lightning as pl
-
+import torch
+import cv2
+from detectron2.engine import DefaultPredictor
+from detectron2.config import get_cfg
+from detectron2 import model_zoo
 load_dotenv(dotenv_path='../my-app/.env')
 
 blob_service_url = f"https://{os.getenv('VITE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net"
@@ -43,7 +48,8 @@ MODELS = {
     'yolov11n': "SEA_yolo11n_200epochs.pt",
     'yolov11l': "SEA_yolo11l_best.pt",
     'rt-detr': "SEA_rt-detr.pt",
-    'detr': "SEA_DETR.ckpt"
+    'detr': "SEA_DETR.ckpt",
+    'faster_rcnn': "SEA_Faster_RCNN.pth"
 }
 
 client = vision.ImageAnnotatorClient()
@@ -59,7 +65,6 @@ def resize_image(image):
     # Calculate new dimensions (25% of original)
     width = int(image.shape[1] * 0.25)
     height = int(image.shape[0] * 0.25)
-    
     # Resize image
     return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
 
@@ -104,7 +109,7 @@ def extract_image_info(image):
     # Extract text using EasyOCR
     text = detect_text(bottom_crop)
     print("Extracted text:", text)  # Debug print
-    
+
     # Separate patterns for date and time
     date_pattern = re.compile(r'(\d{2}-\d{2}-\d{4})')
     time_pattern = re.compile(r'(\d{2}:\d{2}:\d{2})')
@@ -233,9 +238,6 @@ class Detr(pl.LightningModule):
         ]
         return torch.optim.AdamW(param_dicts, lr=self.lr, weight_decay=self.weight_decay)
 
-
-
-
 @app.route('/stop-detection', methods=['POST'])
 def stop_detection():
     global is_detection_stopped
@@ -256,6 +258,18 @@ def detect_potholes():
         model = YOLO(model_path)
     elif selected_model == "rt-detr":
         model = RTDETR(model_path)
+    elif selected_model == "faster_rcnn":
+        cfg = get_cfg()
+        cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml"))  # Load model config from detectron2's model zoo
+        cfg.MODEL.WEIGHTS = 'C:/Users/longh/Documents/potholytics/backend/SEA_Faster_RCNN.pth'  # Path to your trained model weights
+        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7  # Confidence threshold for predictions
+        cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # Set number of classes (1 for your case)
+
+        # Force model to run on CPU
+        cfg.MODEL.DEVICE = 'cpu'
+
+        # Initialize the predictor with the configured settings
+        predictor = DefaultPredictor(cfg)
     else:
         model = Detr.load_from_checkpoint(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4, checkpoint_path=model_path)
     if not model_path:
@@ -306,7 +320,7 @@ def detect_potholes():
                         continue
                     else:
                         last_info = info
-                        if selected_model != "detr":
+                        if selected_model == "yolov11n" or selected_model == "yolov11l":
                             results = model(frame)
                             if len(results) >0:
                                 result = results[0]
@@ -340,6 +354,30 @@ def detect_potholes():
                                     "info": info,
                                     "image": frame_base64,
                                     "detections_count": len(detection_data)
+                                })
+                            results = None
+                        elif selected_model == "faster_rcnn":
+                            outputs = predictor(frame)
+                            res = outputs['instances'].to('cpu')  # Move the results to CPU for easier manipulation
+                            # Draw the predictions on the image
+                            if len(res) !=0:
+                                for i, s in enumerate(res.scores.tolist()):
+                                    # Get bounding box coordinates and the score
+                                    box = res.pred_boxes.tensor.tolist()[i]
+                                    x1, y1, x2, y2 = map(int, box)
+                                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 4)
+                                    cv2.putText(frame, f'{s:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 4)  # Display score above the box
+
+                                # Convert BGR (OpenCV) format to RGB (for matplotlib display)
+                                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                frame = resize_image(frame)
+                                # Convert frame to base64 for sending to frontend
+                                _, buffer = cv2.imencode('.jpg', frame)
+                                frame_base64 = base64.b64encode(buffer).decode('utf-8')
+                                annotated_frames.insert(0, {
+                                    "info": info,
+                                    "image": frame_base64,
+                                    "detections_count": len(res)
                                 })
                             results = None
                         else:
@@ -390,7 +428,7 @@ def detect_potholes():
             if is_detection_stopped:  # Check if detection should stop
                 return jsonify({'error': 'Detection stopped'}), 200
 
-            if selected_model != "detr":
+            if selected_model == "yolov11n" or selected_model == "yolov11l":
                 results = model(frame)
                 if len(results) > 0:
                     result = results[0]
@@ -423,6 +461,32 @@ def detect_potholes():
                             "image": frame_base64,
                             "detections_count": len(detection_data)
                         })
+            elif selected_model == "faster_rcnn":
+                outputs = predictor(frame)
+                res = outputs['instances'].to('cpu')  # Move the results to CPU for easier manipulation
+                # Draw the predictions on the image
+                if len(res) !=0:
+                    info = extract_image_info(frame)
+                    for i, s in enumerate(res.scores.tolist()):
+                        # Get bounding box coordinates and the score
+                        box = res.pred_boxes.tensor.tolist()[i]
+                        x1, y1, x2, y2 = map(int, box)
+                        
+                        # Draw bounding box and label with score on the image
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 4)
+                        cv2.putText(frame, f'pothole {s:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 4)  # Display score above the box
+
+                    # Convert BGR (OpenCV) format to RGB (for matplotlib display)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame = resize_image(frame)
+                    # Convert frame to base64 for sending to frontend
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    frame_base64 = base64.b64encode(buffer).decode('utf-8')
+                    annotated_frames.insert(0, {
+                        "info": info,
+                        "image": frame_base64,
+                        "detections_count": len(res)
+                    })
             else:
                 with torch.no_grad():
                 # load image and predict
@@ -450,7 +514,6 @@ def detect_potholes():
                     label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
                     frame = box_annotator.annotate(scene=frame, detections=detection_data)
                     frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels2)
-                    print(7)
                     # Resize the frame
                     frame = resize_image(frame)
                     # Convert frame to base64
@@ -467,10 +530,10 @@ def detect_potholes():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        # Clean up temporary file
-        if os.path.exists(filepath):
-            os.remove(filepath)
+    # finally:
+    #     # Clean up temporary file
+    #     if os.path.exists(filepath):
+    #         os.remove(filepath)
 
 @app.route('/save-detections', methods=['POST'])
 def save_detections():

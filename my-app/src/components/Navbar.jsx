@@ -13,6 +13,7 @@ const Navbar = () => {
             <div className="flex gap-8">
               <Link to="/" className="text-gray-700 hover:text-gray-900">Home</Link>
               <Link to="/dashboard" className="text-gray-700 hover:text-gray-900">Dashboard</Link>
+              <Link to="/comparison" className="text-gray-700 hover:text-gray-900">Comparison</Link>
             </div>
           </div>
         </nav>

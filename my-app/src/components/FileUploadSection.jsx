@@ -383,6 +383,7 @@ const FileUploadSection = () => {
             <option value="yolov11l">YOLOv11l</option>
             <option value="rt-detr">RT-DETR</option>
             <option value="detr">DETR</option>
+            <option value="faster_rcnn">Faster R-CNN</option>
             
           </select>
         </div>
