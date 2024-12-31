@@ -2,7 +2,7 @@ from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 import supervision as sv
 import numpy as np
-from ultralytics import YOLO
+from ultralytics import YOLO, RTDETR
 import cv2
 import os
 from werkzeug.utils import secure_filename
@@ -15,11 +15,16 @@ from dotenv import load_dotenv
 from google.cloud import vision
 from pymongo import MongoClient
 from azure.storage.blob import BlobServiceClient, BlobClient
+import torch
+from transformers import DetrForObjectDetection, DetrImageProcessor
+import pytorch_lightning as pl
 
 load_dotenv(dotenv_path='../my-app/.env')
 
 blob_service_url = f"https://{os.getenv('VITE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net"
-
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+CONFIDENCE_TRESHOLD = 0.5
+image_processor = DetrImageProcessor.from_pretrained('facebook/detr-resnet-50')
 # Initialize the BlobServiceClient
 blob_service_client = BlobServiceClient(account_url=blob_service_url, credential=os.getenv('VITE_AZURE_SAS_TOKEN'))
 
@@ -37,8 +42,8 @@ CORS(app)  # Enable CORS for all routes
 MODELS = {
     'yolov11n': "SEA_yolo11n_200epochs.pt",
     'yolov11l': "SEA_yolo11l_best.pt",
-    're-detr': "SEA_rt-detr.pt",
-    'detr': "SEA_DETR_epoch=epoch=31-val_loss=val_loss=0.00.ckpt"
+    'rt-detr': "SEA_rt-detr.pt",
+    'detr': "SEA_DETR.ckpt"
 }
 
 client = vision.ImageAnnotatorClient()
@@ -167,6 +172,69 @@ def insert_frames(frames):
     except Exception as e:
         print("Failed to connect to MongoDB:", e)
 
+class Detr(pl.LightningModule):
+
+    def __init__(self, lr, lr_backbone, weight_decay):
+        super().__init__()
+        self.model = DetrForObjectDetection.from_pretrained(
+            pretrained_model_name_or_path='facebook/detr-resnet-50', 
+            num_labels= 1,
+            ignore_mismatched_sizes=True
+        )
+        
+        self.lr = lr
+        self.lr_backbone = lr_backbone
+        self.weight_decay = weight_decay
+
+    def forward(self, pixel_values, pixel_mask):
+        return self.model(pixel_values=pixel_values, pixel_mask=pixel_mask)
+
+    def common_step(self, batch, batch_idx):
+        pixel_values = batch["pixel_values"]
+        pixel_mask = batch["pixel_mask"]
+        labels = [{k: v.to(self.device) for k, v in t.items()} for t in batch["labels"]]
+
+        outputs = self.model(pixel_values=pixel_values, pixel_mask=pixel_mask, labels=labels)
+
+        loss = outputs.loss
+        loss_dict = outputs.loss_dict
+
+        return loss, loss_dict
+
+    def training_step(self, batch, batch_idx):
+        loss, loss_dict = self.common_step(batch, batch_idx)     
+        # logs metrics for each training_step, and the average across the epoch
+        self.log("training_loss", loss)
+        for k,v in loss_dict.items():
+            self.log("train_" + k, v.item())
+
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss, loss_dict = self.common_step(batch, batch_idx)     
+        self.log("validation/loss", loss)
+        for k, v in loss_dict.items():
+            self.log("validation_" + k, v.item())
+            
+        return loss
+
+    def configure_optimizers(self):
+        # DETR authors decided to use different learning rate for backbone
+        # you can learn more about it here: 
+        # - https://github.com/facebookresearch/detr/blob/3af9fa878e73b6894ce3596450a8d9b89d918ca9/main.py#L22-L23
+        # - https://github.com/facebookresearch/detr/blob/3af9fa878e73b6894ce3596450a8d9b89d918ca9/main.py#L131-L139
+        param_dicts = [
+            {
+                "params": [p for n, p in self.named_parameters() if "backbone" not in n and p.requires_grad]},
+            {
+                "params": [p for n, p in self.named_parameters() if "backbone" in n and p.requires_grad],
+                "lr": self.lr_backbone,
+            },
+        ]
+        return torch.optim.AdamW(param_dicts, lr=self.lr, weight_decay=self.weight_decay)
+
+
+
 
 @app.route('/stop-detection', methods=['POST'])
 def stop_detection():
@@ -181,13 +249,17 @@ def detect_potholes():
     
     # Get the selected model from the request, default to YOLOv11n if not specified
     selected_model = request.form.get('model', 'yolov11n')
-    
+    print(selected_model)
     # Load the selected model
     model_path = MODELS.get(selected_model)
+    if selected_model == "yolov11n" or selected_model == "yolov11l":
+        model = YOLO(model_path)
+    elif selected_model == "rt-detr":
+        model = RTDETR(model_path)
+    else:
+        model = Detr.load_from_checkpoint(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4, checkpoint_path=model_path)
     if not model_path:
         return jsonify({'error': 'Invalid model selected'}), 400
-    if selected_model != "detr":
-        model = YOLO(model_path)
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -207,45 +279,41 @@ def detect_potholes():
         detections = []
         annotated_frames = []  # Store annotated frames
         last_info = {
-            'date': None,
-            'time': None,
-            'latitude': None,
-            'longitude': None,
-            'address': None
+        'date': None,
+        'time': None,
+        'latitude': None,
+        'longitude': None,
+        'address': None
         }
-      
+        
         if is_video:
             # Process video
             cap = cv2.VideoCapture(filepath)
             frame_count = 0
             
-            try:
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
-                    if is_detection_stopped:  # Check if detection should stop
-                        break
-
-                    if frame_count % 30 == 0:  # Process every 30th frame (1 fps)
-                        info = extract_image_info(frame)
-
-                        if info.get("latitude") == last_info.get("latitude") and info.get("longitude") == last_info.get("longitude"):
-                            frame_count += 1
-                            last_info = info
-                            continue
-                        else:
-                            results = model(frame)
+                if is_detection_stopped:  # Check if detection should stop
+                    break
+                if frame_count % 30 == 0:  # Process every 30th frame (1 fps)
+                    info = extract_image_info(frame)
+                    if info.get("latitude") == last_info.get("latitude") and info.get("longitude") == last_info.get("longitude"):
+                        frame_count += 1
                         last_info = info
-                        
-                        # Process results
-                        if results and len(results) > 0:
-                            result = results[0]
-                            detection_data = sv.Detections.from_ultralytics(result)
+                        continue
+                    else:
+                        last_info = info
+                        if selected_model != "detr":
+                            results = model(frame)
+                            if len(results) >0:
+                                result = results[0]
+                                detection_data = sv.Detections.from_ultralytics(result)
                             
                             # Only process frames with detections
-                            if len(detection_data) > 0:
+                            if len(detection_data) !=0:
                                 # Create annotators
                                 box_annotator = sv.BoxAnnotator(thickness=4)
                                 label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
@@ -256,7 +324,7 @@ def detect_potholes():
                                     confidence = float(detection[2])
                                     class_id = int(detection[3])
                                     labels.append(f"{model.names[int(class_id)]} {confidence:0.2f}")
-                                
+                                print(detection_data)
                                 # Annotate the frame
                                 frame = box_annotator.annotate(scene=frame, detections=detection_data)
                                 frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels)
@@ -274,10 +342,47 @@ def detect_potholes():
                                     "detections_count": len(detection_data)
                                 })
                             results = None
-                    frame_count += 1
-            finally:
-                # Ensure the video capture object is released
-                cap.release()
+                        else:
+                            with torch.no_grad():
+                            # load image and predict
+                                inputs = image_processor(images=frame, return_tensors='pt').to(DEVICE)
+                                outputs = model(**inputs)
+                                # post-process
+                                target_sizes = torch.tensor([frame.shape[:2]]).to(DEVICE)
+                                results = image_processor.post_process_object_detection(
+                                    outputs=outputs, 
+                                    threshold=CONFIDENCE_TRESHOLD, 
+                                    target_sizes=target_sizes
+                                )[0]
+                                if len(results) >0:
+                                    detection_data = sv.Detections.from_transformers(transformers_results=results)
+                                if len(detection_data) !=0:
+                                    detection_data.with_nms(threshold=0.1)
+                                labels2 = []
+                                for detection in detection_data:
+                                    confidence = float(detection[2])
+                                    class_id = int(detection[3])
+                                    labels2.append(f"pothole {confidence:0.2f}")
+                                box_annotator = sv.BoxAnnotator(thickness=4)
+                                label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
+
+                                frame = box_annotator.annotate(scene=frame, detections=detection_data)
+                                frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels2)
+                                frame = resize_image(frame)
+                                # Convert frame to base64 for sending to frontend
+                                _, buffer = cv2.imencode('.jpg', frame)
+                                frame_base64 = base64.b64encode(buffer).decode('utf-8')
+                                annotated_frames.insert(0, {
+                                    "info": info,
+                                    "image": frame_base64,
+                                    "detections_count": len(detection_data)
+                                })
+                            results = None
+
+                    # Process results
+                frame_count += 1
+            
+            cap.release()
 
         else:
             # Process image
@@ -285,29 +390,67 @@ def detect_potholes():
             if is_detection_stopped:  # Check if detection should stop
                 return jsonify({'error': 'Detection stopped'}), 200
 
-            results = model(frame)
-            
-            if len(results) > 0:
-                result = results[0]
-                detection_data = sv.Detections.from_ultralytics(result)
-                
-                # Only process if there are detections
-                if len(detection_data) > 0:
-                    info = extract_image_info(frame)
-                    # Create annotators
-                    box_annotator = sv.BoxAnnotator(thickness=4)
-                    label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
-                    # Prepare labels
-                    labels = []
+            if selected_model != "detr":
+                results = model(frame)
+                if len(results) > 0:
+                    result = results[0]
+                    detection_data = sv.Detections.from_ultralytics(result)
+                    
+                    # Only process if there are detections
+                    if len(detection_data) > 0:
+                        info = extract_image_info(frame)
+                        # Create annotators
+                        box_annotator = sv.BoxAnnotator(thickness=4)
+                        label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
+                        # Prepare labels
+                        labels = []
+                        for detection in detection_data:
+                            confidence = float(detection[2])
+                            class_id = int(detection[3])
+                            labels.append(f"{model.names[int(class_id)]} {confidence:0.2f}")
+                        
+                        # Annotate the frame
+                        frame = box_annotator.annotate(scene=frame, detections=detection_data)
+                        frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels)
+
+                        # Resize the frame
+                        frame = resize_image(frame)
+                        # Convert frame to base64
+                        _, buffer = cv2.imencode('.jpg', frame)
+                        frame_base64 = base64.b64encode(buffer).decode('utf-8')
+                        annotated_frames.insert(0, {
+                            "info": info,
+                            "image": frame_base64,
+                            "detections_count": len(detection_data)
+                        })
+            else:
+                with torch.no_grad():
+                # load image and predict
+                    inputs = image_processor(images=frame, return_tensors='pt').to(DEVICE)
+                    outputs = model(**inputs)
+                    print(1)
+                    # post-process
+                    target_sizes = torch.tensor([frame.shape[:2]]).to(DEVICE)
+                    results = image_processor.post_process_object_detection(
+                        outputs=outputs, 
+                        threshold=CONFIDENCE_TRESHOLD, 
+                        target_sizes=target_sizes
+                    )[0]
+                    if len(results) >0:
+                        info = extract_image_info(frame)
+                        detection_data = sv.Detections.from_transformers(transformers_results=results)
+                    if len(detection_data) !=0:
+                        detection_data.with_nms(threshold=0.1)
+                    labels2 = []
                     for detection in detection_data:
                         confidence = float(detection[2])
                         class_id = int(detection[3])
-                        labels.append(f"{model.names[int(class_id)]} {confidence:0.2f}")
-                    
-                    # Annotate the frame
+                        labels2.append(f"pothole {confidence:0.2f}")
+                    box_annotator = sv.BoxAnnotator(thickness=4)
+                    label_annotator = sv.LabelAnnotator(text_thickness=2, text_scale=1)
                     frame = box_annotator.annotate(scene=frame, detections=detection_data)
-                    frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels)
-
+                    frame = label_annotator.annotate(scene=frame, detections=detection_data, labels=labels2)
+                    print(7)
                     # Resize the frame
                     frame = resize_image(frame)
                     # Convert frame to base64
@@ -322,14 +465,12 @@ def detect_potholes():
             "frames": annotated_frames
         })
 
-
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     finally:
         # Clean up temporary file
         if os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-            except PermissionError:
-                print(f"Unable to remove file: {filepath}")
+            os.remove(filepath)
 
 @app.route('/save-detections', methods=['POST'])
 def save_detections():

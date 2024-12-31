@@ -11,6 +11,7 @@ const Dashboard = () => {
   const [selectedPothole, setSelectedPothole] = useState(null);
   const [potholeImage, setPotholeImage] = useState(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const mapID = import.meta.env.VITE_GOOGLE_MAPS_ID;
 
   useEffect(() => {
     const fetchPotholeData = async () => {
@@ -200,7 +201,7 @@ const Dashboard = () => {
         <div style={{ height: "80vh", width: "100%" }}>
           <Map 
             defaultCenter={center}
-            mapId="8e700f7bc61d867b"
+            mapId= {mapID}
             zoomControl={true}
             scrollwheel={true}
             defaultZoom={9}
