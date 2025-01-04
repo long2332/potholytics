@@ -281,7 +281,6 @@ def detect_potholes():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
-
     try:
         # Save the file temporarily
         filename = secure_filename(file.filename)
@@ -320,12 +319,14 @@ def detect_potholes():
                         continue
                     else:
                         last_info = info
-                        if selected_model == "yolov11n" or selected_model == "yolov11l":
+                        if selected_model == "yolov11n" or selected_model == "yolov11l" or selected_model == "rt-detr":
+                            print(1)
                             results = model(frame)
+                            print(2)
                             if len(results) >0:
                                 result = results[0]
                                 detection_data = sv.Detections.from_ultralytics(result)
-                            
+                            print(3)
                             # Only process frames with detections
                             if len(detection_data) !=0:
                                 # Create annotators
@@ -428,7 +429,7 @@ def detect_potholes():
             if is_detection_stopped:  # Check if detection should stop
                 return jsonify({'error': 'Detection stopped'}), 200
 
-            if selected_model == "yolov11n" or selected_model == "yolov11l":
+            if selected_model == "yolov11n" or selected_model == "yolov11l" or selected_model == "rt-detr":
                 results = model(frame)
                 if len(results) > 0:
                     result = results[0]
@@ -530,10 +531,10 @@ def detect_potholes():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    # finally:
-    #     # Clean up temporary file
-    #     if os.path.exists(filepath):
-    #         os.remove(filepath)
+    finally:
+        # Clean up temporary file
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route('/save-detections', methods=['POST'])
 def save_detections():

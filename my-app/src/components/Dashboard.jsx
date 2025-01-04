@@ -113,8 +113,8 @@ const Dashboard = () => {
       const city = pothole.info.city;
       const state = pothole.info.state;
 
-      stateCounts[state] = (stateCounts[state] || 0) + 1;
-      cityCounts[city] = (cityCounts[city] || 0) + 1;
+      stateCounts[state] = (stateCounts[state] || 0) + pothole.detections_count;
+      cityCounts[city] = (cityCounts[city] || 0) + pothole.detections_count;
     });
 
     return { stateCounts, cityCounts };
@@ -155,7 +155,9 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-semibold">Total Potholes Detected</h2>
-          <p className="text-2xl font-bold">{potholeData.length}</p>
+          <p className="text-2xl font-bold">
+            {potholeData.reduce((total, pothole) => total + pothole.detections_count, 0)}
+          </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-semibold">Most Recent Detection</h2>
