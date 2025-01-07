@@ -255,11 +255,11 @@ const Comparison = () => {
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">Select Model 1</option>
-          <option value="rt-detr">RT-DETR (MAP@50: 50.7%)</option>
-          <option value="yolov11n">YOLOv11n (MAP@50: 49.1%)</option>
-          <option value="yolov11l">YOLOv11l (MAP@50: 48.4%)</option>
-          <option value="faster_rcnn">Faster R-CNN (MAP@50: 43.4%)</option>
-          <option value="detr">DETR (MAP@50: 27.2%)</option>
+          <option value="yolov11l">YOLOv11l (mAP@50: 54.6% | inference time: 13.8ms)</option>
+          <option value="rt-detr">RT-DETR (mP@50: 49.3% | inference time: 19.6ms)</option>
+          <option value="yolov11n">YOLOv11n (mAP@50: 49.0% | inference time: 4.4ms)</option>
+          <option value="faster_rcnn">Faster R-CNN (mAP@50: 48.1% | inference time: 51.5ms)</option>
+          <option value="detr">DETR (mAP@50: 27.2% | inference time: 46.14ms)</option>     
         </select>
       </div>
       <div className="mb-4">
@@ -271,11 +271,11 @@ const Comparison = () => {
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">Select Model 2</option>
-          <option value="rt-detr">RT-DETR (MAP@50: 50.7%)</option>
-          <option value="yolov11n">YOLOv11n (MAP@50: 49.1%)</option>
-          <option value="yolov11l">YOLOv11l (MAP@50: 48.4%)</option>
-          <option value="faster_rcnn">Faster R-CNN (MAP@50: 43.4%)</option>
-          <option value="detr">DETR (MAP@50: 27.2%)</option>
+          <option value="yolov11l">YOLOv11l (mAP@50: 54.6% | inference time: 13.8ms)</option>
+          <option value="rt-detr">RT-DETR (mP@50: 49.3% | inference time: 19.6ms)</option>
+          <option value="yolov11n">YOLOv11n (mAP@50: 49.0% | inference time: 4.4ms)</option>
+          <option value="faster_rcnn">Faster R-CNN (mAP@50: inference time: 48.1% | 51.5ms)</option>
+          <option value="detr">DETR (mAP@50: 27.2% | inference time: 46.14ms)</option>     
         </select>
       </div>
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
